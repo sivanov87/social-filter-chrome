@@ -13,6 +13,73 @@ s.onload = function() {
 (document.head||document.documentElement).appendChild(s);
 }
 
+function vkGetAuthorFromStr( str )
+{
+	var isScreenName = vkIsScreenName( str );
+	if( isScreenName )
+	{
+		ret = {};
+		ret.login = str;
+		ret.id = vkGetIdFromScreenName( str );
+		return ret;
+	}
+	
+	return null;
+}
+
+
+function vkIsScreenName( str )
+{
+	var reSearch = /^search/;
+	var reAlbums = /^albums(\d*)$/;
+	var reAway = /^away.php/;
+	var reWall = /^wall/;
+	var reArg = /\?/;
+	var reGroups = /^groups/;
+	var reApps = /^app/;
+	var reFeed = /^feed/;
+	
+	if( str.match( reGroups ) ||
+		str.match( reApps ) ||
+		str.match( reArg ) ||
+		str.match( reSearch ) ||
+		str.match( reAlbums ) ||
+		str.match( reAway ) ||
+		str.match( reFeed ) ||
+		str.match( reWall ) )
+	{
+		return false;
+	}
+	
+	return true;
+}
+
+function vkGetIdFromScreenName( screenName )
+{
+	var reUser = /id(\d*)$/;
+	var rePublic = /public(\d*)$/;
+	var reClub = /public(\d*)$/;
+	var reEvent = /event(\d*)$/;
+	
+	if( screenName.match( reUser ) )
+	{
+		return parseInt( screenName.replace(reUser, "$1") );
+	}
+	if( screenName.match( rePublic ) )
+	{
+		return  ( - parseInt( screenName.replace(rePublic, "$1") ) );
+	}
+	if( screenName.match( reClub ) )
+	{
+		return  ( - parseInt( screenName.replace(reClub, "$1") ) );
+	}
+	if( screenName.match( reEvent ) )
+	{
+		return  ( - parseInt( screenName.replace(reEvent, "$1") ) );
+	}
+	return null;		
+}
+
 // APPLIES
 
 var opacityLevelBad = 0.2;
@@ -23,7 +90,7 @@ function applyElementRate( element, rate, reason )
 	opacity = 1.0;
 	if( rate >= 80 )
 	{
-		color = "#F0FFF0";
+		color = "#E0FFE0";
 		opacity = 1.0;
 	}
 	if( rate < 20 && rate > -20 )
@@ -112,8 +179,16 @@ function checkAll()
 	});
 	
 	requestData = [];
-	objectsRated.online.forEach( function( obj ) { 
-		requestData.push( obj );
+	objectsRated.online.forEach( function( obj ) {
+		var objToSend = {};
+		objToSend.sn = obj.sn;
+		if( obj.author )
+		{
+			objToSend.author = {};
+			objToSend.author.id = obj.author.id;
+			objToSend.author.login = obj.author.login;
+		}
+		requestData.push( objToSend );
 	});
 	
 	if( requestData.length > 0 )
@@ -173,23 +248,21 @@ checkMap[":\/\/vk\.com\/"] =
 		var re = /\/(.*)/;
 		var author_element = $( obj ).find( ".bp_thumb" );
 		var str = author_element.attr("href");
-		var login = str.replace( re, "$1" );
-		var ret = {
-			element : obj,
-			sn: "vk",
-			author : 
-			{
-				login : login,
-				img : $( obj ).find(".bp_thumb").children("img").attr("src")
-			}
-		};
-		reId = /^id(\d*)$/;
-		if( login.match( reId ) )
+		var shortName = str.replace( re, "$1" );
+		var author = vkGetAuthorFromStr( shortName );
+		if( author )
 		{
-			id = login.replace( reId, "$1" );
-			ret.author.id = id;
+			var ret = {
+				element : obj,
+				sn: "vk",
+				author : author
+			}
+			
+			ret.author.img = $( obj ).find(".bp_thumb").children("img").attr("src");
+			return ret;
 		}
-		return ret;
+			
+		return null;
 	},
 	".user_block" : function( obj )
 	{
@@ -223,7 +296,6 @@ checkMap[":\/\/vk\.com\/"] =
 	},
 	".post_table" : function( obj ) {
 		var icon = $( obj ).children(".post_image").children(".post_image");
-		var re = /\/id(\d*)/;
 		var id = $( obj ).find( ".author" ).attr("data-from-id");
 		var ret = {
 				element : obj,
@@ -253,40 +325,42 @@ checkMap[":\/\/vk\.com\/"] =
 		return ret;
 	},	
 	"a" : function( obj ) {
-		var re = /^\/id(\d*)$/;
+		var re = /^\/.*$/;
 		var str = $( obj ).attr("href");
 		if( str && str.match( re ) )
 		{
-			var id = parseInt( str.replace(re, "$1") );
-			var ret = {
-				element : obj,
-				sn: "vk",
-				author : 
-				{
-					id : id,
+			var shortName = str.substring( 1 );
+			var author = vkGetAuthorFromStr( shortName );
+			if( author )
+			{
+				var ret = {
+					element : obj,
+					sn: "vk",
+					author : author
 				}
-			}
 		
-			return ret;
+				return ret;
+			}
 		}
 		return null;
 	},
 	"#header" : function( obj ) {
-		var re = /https*:\/\/vk\.com\/id(\d*)$/;
+		var re = /https?:\/\/(m\.)?vk\.com\/(.*)/;
 		var str = window.location.href;
 		if( str && str.match( re ) )
 		{
-			var id = parseInt( str.replace(re, "$1") );
-			var ret = {
-				element : obj,
-				sn: "vk",
-				author : 
-				{
-					id : id
+			var shortName = str.replace( re, "$2" );
+			var author = vkGetAuthorFromStr( shortName );
+			if( author )
+			{
+				var ret = {
+					element : obj,
+					sn: "vk",
+					author : author
 				}
-			}
 		
-			return ret;
+				return ret;
+			}
 		}
 		return null;
 	}
@@ -309,21 +383,21 @@ checkMap["\.livejournal\.com\/"] = {
 
 checkMap[".*"] = {
 	"a" : function( obj ) {
-		var re = /https*:\/\/vk\.com\/id(\d*)/;
+		var re = /https?:\/\/(m\.)?vk\.com\/(.*)/;
 		var str = $( obj ).attr("href");
 		if( str && str.match( re ) )
 		{
-			var id1 = parseInt( str.replace(re, "$1") );
-			if( id1 )
+			var shortName = str.replace( re, "$2" );
+			
+			var author = vkGetAuthorFromStr( shortName );
+			if( author )
 			{
 				var ret = {
 					element : obj,
 					sn: "vk",
-					author : 
-					{
-						id : id1
-					}
-				}	
+					author : author
+				}
+		
 				return ret;
 			}
 		}
@@ -353,42 +427,22 @@ checkMap[":\/\/twitter\.com\/"] = {
 checkMap[":\/\/blogs\.yandex\.ru\/"] = {
 	".b-item" : function( obj ) {
 		var url = $( obj ).find(".SearchStatistics-link").attr("href");
-		if( url && url.match(/:\/\/vk\.com\//) )
+		if( url && url.match(/:\/\/(m\.)?vk\.com\//) )
 		{
-		
-			var reId = /https?:\/\/vk\.com\/id(\d*)/;
 			var str = $( obj ).find(".b-hlist").find(".SearchStatistics-username").attr("href");
-			var reLogin = /https?:\/\/vk\.com\/(.*)/;
+			var reScreenName = /https?:\/\/(m\.)?vk\.com\/(.*)/;
 			
-			var id = parseInt( str.replace(reId, "$1") );
-			if( id )
+			var shortName = str.replace( reScreenName, "$2" );
+			var author = vkGetAuthorFromStr( shortName );
+			if( author )
 			{
 				var ret = {
 					element : obj,
 					sn: "vk",
-					author : 
-					{
-						id : id
-					}
+					author : author
 				}
+		
 				return ret;
-			}
-			else
-			{
-				var login = str.replace(reLogin, "$1");
-				if( login )
-				{
-					var ret = {
-						element : obj,
-						sn: "vk",
-						author : 
-						{
-							login : login
-						}
-					}
-					return ret;
-				}
-			
 			}
 		}
 		
@@ -415,8 +469,6 @@ checkMap[":\/\/blogs\.yandex\.ru\/"] = {
 		urlTwitter = $( obj ).find(".SearchStatistics-twitter-item").attr("href");
 		if( urlTwitter )
 		{
-		
-			var re = /https?:\/\/vk\.com\/id(\d*)/;
 			var login = $( obj ).find(".b-hlist__name").text();
 			if( login )
 			{

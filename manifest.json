@@ -4,7 +4,7 @@
 	"name": "Социальный фильтр",
 	"short_name": "Социальный фильтр",
 	"description": "Приложение для фильтрации мошеннических и подозрительных аккаунтов в соцсетях.",
-    "version": "0.1.0",
+    "version": "0.1.2",
     
 	"homepage_url": "http://socialfilter.ru",
     
@@ -12,7 +12,10 @@
         "default_icon": "icon.png",
 		"default_popup": "popup.html" 
     },
-
+	"icons": {
+        "128": "icon.png"
+	},
+	
     "background": {
         "scripts": ["jquery-1.11.3.min.js","background.js"],
         "persistent": true
